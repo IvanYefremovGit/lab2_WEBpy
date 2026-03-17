@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-1">Запис в електронну чергу</h2>
+    <div class="text-muted">Оберіть послугу, дату та доступний час</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="/my/tickets">Перейти до моїх записів</a>
+</div>
+
+{% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="row g-3">
+  <div class="col-12 col-lg-7">
+    <div class="card card-soft p-4">
+      <form method="post" action="/tickets/create">
+        <div class="mb-3">
+          <label class="form-label">Послуга</label>
+          <select name="service_id" id="serviceSelect" class="form-select" required>
+            {% for s in services %}
+              <option value="{{ s.id }}" {% if s.id == selected_service_id %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Показуються лише активні послуги</div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">Дата</label>
+            <select name="date" id="dateSelect" class="form-select" required>
+              {% for d in dates %}
+                <option value="{{ d }}" {% if d == selected_date %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Пн–Пт</div>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Час</label>
+            <select name="time" id="timeSelect" class="form-select" required>
+              {% for t in times %}
+                <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Тільки вільні слоти</div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-4">
+          <button class="btn btn-primary">Записатись</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="refreshTimes()">Оновити час</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card card-soft p-4">
+      <h5 class="mb-3">Правила запису</h5>
+      <ul class="mb-0 text-muted">
+        <li>Робочі години: 08:00–17:00 (останній слот 16:50)</li>
+        <li>Крок: 10 хв</li>
+        <li>Вихідні: субота/неділя — недоступні</li>
+        <li>Запис мінімум за 30 хв наперед</li>
+        <li>Зайняті слоти не показуються</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function refreshTimes() {
+    const date = document.getElementById("dateSelect").value;
+
+    const res = await fetch(`/free-times?date=${encodeURIComponent(date)}`);
+    const data = await res.json();
+
+    const timeSelect = document.getElementById("timeSelect");
+    timeSelect.innerHTML = "";
+
+    (data.times || []).forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      timeSelect.appendChild(opt);
+    });
+
+    if (timeSelect.options.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "Немає вільних слотів";
+      timeSelect.appendChild(opt);
+    }
+  }
+
+  document.getElementById("dateSelect").addEventListener("change", refreshTimes);
+</script>
+
+{% endblock %}

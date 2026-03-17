@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card card-soft p-4">
+      <h3 class="mb-3">Вхід</h3>
+      <p class="text-muted mb-4">Увійди як <b>user/user</b> або <b>admin/admin</b></p>
+
+      {% if error %}
+        <div class="alert alert-danger py-2">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="/login" class="d-grid gap-3">
+        <div>
+          <label class="form-label">Логін</label>
+          <input name="username" class="form-control" placeholder="username" required>
+        </div>
+
+        <div>
+          <label class="form-label">Пароль</label>
+          <input name="password" class="form-control" placeholder="password" type="password" required>
+        </div>
+
+        <button class="btn btn-primary">Увійти</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

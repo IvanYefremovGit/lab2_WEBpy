@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-1">Черга</h2>
+    <div class="text-muted">Керування статусами записів</div>
+  </div>
+</div>
+
+<div class="card card-soft p-3">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Талон</th>
+          <th>Користувач</th>
+          <th>Послуга</th>
+          <th>Час</th>
+          <th>Статус</th>
+          <th>Ким скасовано</th>
+          <th class="text-end">Дії</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for t in tickets %}
+        <tr>
+          <td class="text-muted">{{ t.id }}</td>
+          <td class="fw-semibold">{{ t.ticket_number }}</td>
+          <td>{{ t.user.username }}</td>
+          <td>
+            {{ t.service.name }}
+            {% if not t.service.is_active %}
+              <span class="badge text-bg-secondary ms-1">неактивна</span>
+            {% endif %}
+          </td>
+          <td>{{ t.scheduled_for }}</td>
+          <td>
+            {% if t.status == "waiting" %}
+              <span class="badge text-bg-warning">waiting</span>
+            {% elif t.status == "approved" %}
+              <span class="badge text-bg-primary">approved</span>
+            {% elif t.status == "served" %}
+              <span class="badge text-bg-success">served</span>
+            {% elif t.status == "no_show" %}
+              <span class="badge text-bg-secondary">no_show</span>
+            {% elif t.status == "canceled" %}
+              <span class="badge text-bg-danger">canceled</span>
+            {% else %}
+              <span class="badge text-bg-light">{{ t.status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.canceled_by %}
+              <span class="text-muted">{{ t.canceled_by }}</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+
+          <td class="text-end">
+            {% if t.status == "canceled" %}
+              <span class="text-muted">—</span>
+
+            {% elif t.status in ["served", "no_show"] %}
+              <span class="text-muted">Завершено</span>
+
+            {% else %}
+              <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                  <input type="hidden" name="status" value="approved">
+                  <button class="btn btn-outline-primary btn-sm">Підтвердити</button>
+                </form>
+
+                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                  <input type="hidden" name="status" value="served">
+                  <button class="btn btn-outline-success btn-sm">Обслуговано</button>
+                </form>
+
+                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                  <input type="hidden" name="status" value="no_show">
+                  <button class="btn btn-outline-secondary btn-sm">Не зʼявився</button>
+                </form>
+
+                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                  <input type="hidden" name="status" value="canceled">
+                  <button class="btn btn-outline-danger btn-sm"
+                          onclick="return confirm('Скасувати запис?')">Скасувати</button>
+                </form>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

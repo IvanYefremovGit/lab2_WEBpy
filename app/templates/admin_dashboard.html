@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-1">Адмін-панель</h2>
+    <div class="text-muted">Користувач: <b>{{ user.username }}</b></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-md-4">
+    <div class="card card-soft p-4">
+      <div class="text-muted">Очікує</div>
+      <div class="display-6 fw-semibold">{{ waiting }}</div>
+      <div class="mt-3">
+        <a class="btn btn-outline-primary w-100" href="/admin/tickets">Перейти до черги</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card card-soft p-4">
+      <div class="text-muted">Послуги</div>
+      <div class="display-6 fw-semibold">{{ services|length }}</div>
+      <div class="mt-3">
+        <a class="btn btn-outline-secondary w-100" href="/admin/services">Редагування послуг</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card card-soft p-4">
+      <div class="text-muted">Swagger / API</div>
+      <div class="display-6 fw-semibold">OpenAPI</div>
+      <div class="mt-3">
+        <a class="btn btn-outline-dark w-100" href="/swagger">Відкрити Swagger</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

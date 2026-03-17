@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-1">Мої записи</h2>
+    <div class="text-muted">Користувач: <b>{{ user.username }}</b></div>
+  </div>
+  <a class="btn btn-primary" href="/">Новий запис</a>
+</div>
+
+<div class="card card-soft p-3">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Талон</th>
+          <th>Час</th>
+          <th>Послуга</th>
+          <th>Статус</th>
+          <th class="text-end">Дія</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for t in tickets %}
+        <tr>
+          <td class="fw-semibold">{{ t.ticket_number }}</td>
+          <td>{{ t.scheduled_for }}</td>
+          <td>{{ t.service.name }}</td>
+          <td>
+            {% if t.status == "waiting" %}
+              <span class="badge text-bg-warning badge-soft">waiting</span>
+            {% elif t.status == "approved" %}
+              <span class="badge text-bg-primary badge-soft">approved</span>
+            {% elif t.status == "served" %}
+              <span class="badge text-bg-success badge-soft">served</span>
+            {% elif t.status == "no_show" %}
+              <span class="badge text-bg-secondary badge-soft">no_show</span>
+            {% elif t.status == "canceled" %}
+              <span class="badge text-bg-danger badge-soft">canceled</span>
+            {% else %}
+              <span class="badge text-bg-light badge-soft">{{ t.status }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            {% if t.status in ["waiting", "approved"] %}
+              <form method="post" action="/tickets/{{ t.id }}/cancel" class="d-inline">
+                <button class="btn btn-outline-danger btn-sm">Скасувати</button>
+              </form>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

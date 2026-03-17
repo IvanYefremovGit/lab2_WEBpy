@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+
+<h2 class="mb-4">Статистика черги</h2>
+
+<div class="row g-4">
+
+<!-- Статуси -->
+<div class="col-lg-4">
+<div class="card card-soft">
+<div class="card-body">
+
+<h5 class="card-title mb-3">Статуси записів</h5>
+
+<table class="table table-striped text-center align-middle">
+<thead class="table-light">
+<tr>
+<th>Статус</th>
+<th>Кількість</th>
+</tr>
+</thead>
+
+<tbody>
+{% for s in status_stats %}
+<tr>
+<td>{{ s[0] }}</td>
+<td><span class="badge bg-primary">{{ s[1] }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+
+</table>
+
+</div>
+</div>
+</div>
+
+
+<!-- Послуги -->
+<div class="col-lg-4">
+<div class="card card-soft">
+<div class="card-body">
+
+<h5 class="card-title mb-3">Записи по послугах</h5>
+
+<table class="table table-striped text-center align-middle">
+<thead class="table-light">
+<tr>
+<th>Послуга</th>
+<th>Кількість</th>
+</tr>
+</thead>
+
+<tbody>
+{% for s in service_stats %}
+<tr>
+<td>{{ s[0] }}</td>
+<td><span class="badge bg-success">{{ s[1] }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+
+</table>
+
+</div>
+</div>
+</div>
+
+
+<!-- Дні -->
+<div class="col-lg-4">
+<div class="card card-soft">
+<div class="card-body">
+
+<h5 class="card-title mb-3">Записи по днях</h5>
+
+<table class="table table-striped text-center align-middle">
+<thead class="table-light">
+<tr>
+<th>Дата</th>
+<th>Кількість</th>
+</tr>
+</thead>
+
+<tbody>
+{% for d in day_stats %}
+<tr>
+<td>{{ d[0] }}</td>
+<td><span class="badge bg-warning text-dark">{{ d[1] }}</span></td>
+</tr>
+{% endfor %}
+</tbody>
+
+</table>
+
+</div>
+</div>
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

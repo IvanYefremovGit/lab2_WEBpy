@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-1">Послуги</h2>
+    <div class="text-muted">Редагування довідника послуг</div>
+  </div>
+  <a class="btn btn-primary" href="/admin/services/new">+ Додати послугу</a>
+</div>
+
+<div class="card card-soft p-3">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Назва</th>
+          <th>Опис</th>
+          <th>Активна</th>
+          <th class="text-end">Дії</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in services %}
+        <tr>
+          <td class="text-muted">{{ s.id }}</td>
+          <td class="fw-semibold">{{ s.name }}</td>
+          <td class="text-muted">{{ s.description }}</td>
+          <td>
+            {% if s.is_active %}
+              <span class="badge text-bg-success">Так</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Ні</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a class="btn btn-outline-primary btn-sm" href="/admin/services/{{ s.id }}/edit">Edit</a>
+            <form method="post" action="/admin/services/{{ s.id }}/delete" class="d-inline">
+              <button class="btn btn-outline-danger btn-sm"
+                      onclick="return confirm('Видалити послугу?')">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

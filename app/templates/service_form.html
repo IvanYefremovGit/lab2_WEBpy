@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h2 class="mb-1">{% if service %}Редагування послуги{% else %}Нова послуга{% endif %}</h2>
+    <div class="text-muted">Заповни поля та збережи</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="/admin/services">Назад</a>
+</div>
+
+<div class="card card-soft p-4">
+  <form method="post" action="{% if service %}/admin/services/{{ service.id }}/edit{% else %}/admin/services/new{% endif %}">
+    <div class="mb-3">
+      <label class="form-label">Назва</label>
+      <input name="name" class="form-control" required
+             value="{% if service %}{{ service.name }}{% endif %}">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Опис</label>
+      <input name="description" class="form-control"
+             value="{% if service %}{{ service.description }}{% endif %}">
+    </div>
+
+    <div class="form-check mb-4">
+      <input class="form-check-input" type="checkbox" name="is_active" id="activeCheck"
+             {% if not service or service.is_active %}checked{% endif %}>
+      <label class="form-check-label" for="activeCheck">
+        Активна (доступна для нових записів)
+      </label>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary">Зберегти</button>
+      <a class="btn btn-outline-secondary" href="/admin/services">Скасувати</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

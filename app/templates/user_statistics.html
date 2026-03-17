@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2 class="mb-4">Моя статистика</h2>
+
+<div class="row g-4 mb-4">
+
+<div class="col-md-3">
+<div class="card card-soft text-center p-3">
+<h6 class="text-muted">Всього записів</h6>
+<h2>{{ total }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card card-soft text-center p-3">
+<h6 class="text-muted">Обслужено</h6>
+<h2 class="text-success">{{ served }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card card-soft text-center p-3">
+<h6 class="text-muted">Скасовано</h6>
+<h2 class="text-danger">{{ canceled }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card card-soft text-center p-3">
+<h6 class="text-muted">Не з'явився</h6>
+<h2 class="text-secondary">{{ no_show }}</h2>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card card-soft text-center p-3">
+<h6 class="text-muted">Активні записи</h6>
+<h2 class="text-primary">{{ active }}</h2>
+</div>
+</div>
+
+</div>
+
+
+<div class="card card-soft p-3">
+
+<h5 class="mb-3">Статистика по послугах</h5>
+
+<table class="table table-striped">
+<thead>
+<tr>
+<th>Послуга</th>
+<th>Записів</th>
+<th>Обслужено</th>
+<th>Скасовано</th>
+<th>Не з'явився</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for s in service_stats %}
+<tr>
+<td>{{ s[0] }}</td>
+<td>{{ s[1] }}</td>
+<td class="text-success">{{ s[2] }}</td>
+<td class="text-danger">{{ s[3] }}</td>
+<td class="text-secondary">{{ s[4] }}</td>
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+
+</div>
+
+{% endblock %}
