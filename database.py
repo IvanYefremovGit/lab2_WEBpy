@@ -5,7 +5,7 @@ def get_connection():
         host="localhost",
         dbname="queue_db",
         user="postgres",
-        password="28032006",
+        password="",
         port=5432
     )
     return conn
