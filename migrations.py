@@ -69,4 +69,4 @@ for t in tickets:
 
 sqlite_conn.close()
 
-print("✅ Migration to MongoDB completed!")
+print("Migration to MongoDB completed!")

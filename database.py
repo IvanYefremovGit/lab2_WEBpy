@@ -1,12 +1,8 @@
-import psycopg
+from pymongo import MongoClient
+
+client = MongoClient("mongodb://localhost:27017/")
+db = client["queue_db"]
 
 
-def get_connection():
-    conn = psycopg.connect(
-        host="localhost",
-        dbname="queue_db",
-        user="postgres",
-        password="",
-        port=5432
-    )
-    return conn
+def get_db():
+    return db
