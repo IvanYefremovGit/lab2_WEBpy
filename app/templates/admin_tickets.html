@@ -23,19 +23,23 @@
           <th class="text-end">Дії</th>
         </tr>
       </thead>
+
       <tbody>
       {% for t in tickets %}
         <tr>
           <td class="text-muted">{{ t.id }}</td>
           <td class="fw-semibold">{{ t.ticket_number }}</td>
           <td>{{ t.user.username }}</td>
+
           <td>
             {{ t.service.name }}
             {% if not t.service.is_active %}
               <span class="badge text-bg-secondary ms-1">неактивна</span>
             {% endif %}
           </td>
+
           <td>{{ t.scheduled_for }}</td>
+
           <td>
             {% if t.status == "waiting" %}
               <span class="badge text-bg-warning">waiting</span>
@@ -51,6 +55,7 @@
               <span class="badge text-bg-light">{{ t.status }}</span>
             {% endif %}
           </td>
+
           <td>
             {% if t.canceled_by %}
               <span class="text-muted">{{ t.canceled_by }}</span>
@@ -60,40 +65,51 @@
           </td>
 
           <td class="text-end">
-            {% if t.status == "canceled" %}
-              <span class="text-muted">—</span>
 
-            {% elif t.status in ["served", "no_show"] %}
-              <span class="text-muted">Завершено</span>
+            {% if t.status == "waiting" %}
+              <!-- 🔥 тільки підтвердження -->
+              <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                <input type="hidden" name="status" value="approved">
+                <button class="btn btn-outline-primary btn-sm">Підтвердити</button>
+              </form>
 
-            {% else %}
-              <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
-                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
-                  <input type="hidden" name="status" value="approved">
-                  <button class="btn btn-outline-primary btn-sm">Підтвердити</button>
-                </form>
-
-                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+            {% elif t.status == "approved" %}
+              <!-- 🔥 після QR -->
+              <div class="d-inline-flex gap-1">
+                <form method="post" action="/admin/tickets/{{ t.id }}/status">
                   <input type="hidden" name="status" value="served">
                   <button class="btn btn-outline-success btn-sm">Обслуговано</button>
                 </form>
 
-                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                <form method="post" action="/admin/tickets/{{ t.id }}/status">
                   <input type="hidden" name="status" value="no_show">
                   <button class="btn btn-outline-secondary btn-sm">Не зʼявився</button>
                 </form>
 
-                <form method="post" action="/admin/tickets/{{ t.id }}/status" class="d-inline">
+                <form method="post" action="/admin/tickets/{{ t.id }}/status">
                   <input type="hidden" name="status" value="canceled">
                   <button class="btn btn-outline-danger btn-sm"
-                          onclick="return confirm('Скасувати запис?')">Скасувати</button>
+                          onclick="return confirm('Скасувати запис?')">
+                    Скасувати
+                  </button>
                 </form>
               </div>
+
+            {% elif t.status in ["served", "no_show"] %}
+              <span class="text-success">Завершено</span>
+
+            {% elif t.status == "canceled" %}
+              <span class="text-muted">Скасовано</span>
+
+            {% else %}
+              <span class="text-muted">—</span>
             {% endif %}
+
           </td>
         </tr>
       {% endfor %}
       </tbody>
+
     </table>
   </div>
 </div>

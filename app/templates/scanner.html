@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container text-center mt-5">
+
+  <div class="card card-soft p-4">
+
+    <h3 class="mb-3">Сканування QR (зображення)</h3>
+
+    <form method="post" action="/admin/scan-image" enctype="multipart/form-data">
+      <input type="file" name="file" class="form-control mb-3">
+      <button class="btn btn-success w-100">Зчитати QR</button>
+    </form>
+
+  </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+
+<h2 class="mb-4">Журнал дій (Logs)</h2>
+
+<div class="card card-soft">
+<div class="card-body">
+
+<table class="table table-striped text-center align-middle">
+<thead class="table-light">
+<tr>
+<th>Дія</th>
+<th>Користувач</th>
+<th>Час</th>
+</tr>
+</thead>
+
+<tbody>
+{% for log in logs %}
+<tr>
+<td>
+    <span class="badge bg-primary badge-soft">
+        {{ log.action }}
+    </span>
+</td>
+
+<td>
+    {{ log.user_id or log.username or "-" }}
+</td>
+
+<td>
+    {{ log.time.strftime("%Y-%m-%d %H:%M") if log.time else "-" }}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+
+</table>
+
+</div>
+</div>
+
+</div>
+
+{% endblock %}

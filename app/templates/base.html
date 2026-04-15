@@ -27,12 +27,13 @@
           <a class="btn btn-outline-light btn-sm" href="/">Головна</a>
           <a class="btn btn-outline-light btn-sm" href="/my/tickets">Мої записи</a>
           <a class="btn btn-outline-light btn-sm" href="/my/statistics">Моя статистика</a>
-          <a class="btn btn-outline-light btn-sm" href="/ai">AI Assistant</a>
         {% elif user.role == "admin" %}
+          <a href="/admin/scanner" class="btn btn-success">Сканувати QR</a>
           <a class="btn btn-outline-light btn-sm" href="/admin">Адмін</a>
           <a class="btn btn-outline-light btn-sm" href="/admin/services">Послуги</a>
           <a class="btn btn-outline-light btn-sm" href="/admin/tickets">Черга</a>
           <a class="btn btn-outline-light btn-sm" href="/admin/statistics">Статистика</a>
+          <a class="btn btn-outline-light btn-sm" href="/admin/logs">Логи</a>
         {% endif %}
 
         <a class="btn btn-outline-light btn-sm" href="/swagger">Swagger</a>

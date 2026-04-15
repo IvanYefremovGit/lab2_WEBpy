@@ -1,79 +1,89 @@
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from datetime import datetime
+from bson import ObjectId
+
+from fastapi import UploadFile, File
+from pyzbar.pyzbar import decode
+from PIL import Image
+import io
 
 from ..deps import get_db
 from ..auth import get_current_user, require_admin
+
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
+# 🔥 універсальна функція логів
+def log_action(db, action: str, user: dict, details: dict = None):
+    db.logs.insert_one({
+        "action": action,
+        "user_id": user["id"],
+        "role": user["role"],
+        "time": datetime.now(),
+        "details": details or {}
+    })
+
+
+# 🔹 Dashboard
 @router.get("", response_class=HTMLResponse)
-def admin_dashboard(request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
+def admin_dashboard(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT id, name, description, is_active FROM services ORDER BY id ASC")
-    services = cursor.fetchall()
-
-    cursor.execute("SELECT COUNT(*) FROM tickets WHERE status='waiting'")
-    waiting = cursor.fetchone()[0]
+    services = list(db.services.find().sort("_id", 1))
 
     services_list = [
-        {"id": s[0], "name": s[1], "description": s[2], "is_active": s[3]}
+        {
+            "id": str(s["_id"]),
+            "name": s["name"],
+            "description": s.get("description", ""),
+            "is_active": s.get("is_active", True)
+        }
         for s in services
     ]
 
+    waiting = db.tickets.count_documents({"status": "waiting"})
+
     return templates.TemplateResponse(
         "admin_dashboard.html",
-        {"request": request, "user": user, "services": services_list, "waiting": waiting},
+        {
+            "request": request,
+            "user": user,
+            "services": services_list,
+            "waiting": waiting,
+        },
     )
 
 
+# 🔹 Tickets list
 @router.get("/tickets", response_class=HTMLResponse)
-def tickets_list(request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
+def tickets_list(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
+    tickets = list(db.tickets.find().sort("scheduled_for", 1))
 
-    cursor.execute(
-        """
-        SELECT
-            t.id,
-            t.ticket_number,
-            u.username,
-            s.name,
-            s.is_active,
-            t.scheduled_for,
-            t.status,
-            t.canceled_by
-        FROM tickets t
-        JOIN users u ON u.id = t.user_id
-        JOIN services s ON s.id = t.service_id
-        ORDER BY t.scheduled_for ASC
-        """
-    )
+    tickets_list = []
 
-    tickets = cursor.fetchall()
+    for t in tickets:
+        user_data = db.users.find_one({"_id": ObjectId(t["user_id"])})
+        service_data = db.services.find_one({"_id": ObjectId(t["service_id"])})
 
-    tickets_list = [
-        {
-            "id": t[0],
-            "ticket_number": t[1],
-            "user": {"username": t[2]},
+        tickets_list.append({
+            "id": str(t["_id"]),
+            "ticket_number": t.get("ticket_number"),
+            "user": {"username": user_data["username"] if user_data else "?"},
             "service": {
-                "name": t[3],
-                "is_active": t[4]
+                "name": service_data["name"] if service_data else t.get("service_name", "Видалено"),
+                "is_active": service_data.get("is_active", False) if service_data else False
             },
-            "scheduled_for": t[5],
-            "status": t[6],
-            "canceled_by": t[7],
-        }
-        for t in tickets
-    ]
+            "scheduled_for": t.get("scheduled_for"),
+            "status": t.get("status"),
+            "canceled_by": t.get("canceled_by"),
+        })
 
     return templates.TemplateResponse(
         "admin_tickets.html",
@@ -81,82 +91,73 @@ def tickets_list(request: Request, conn=Depends(get_db)):
     )
 
 
+# 🔹 Зміна статусу
+@router.post("/tickets/{ticket_id}/status")
 @router.post("/tickets/{ticket_id}/status")
 def set_ticket_status(
-    ticket_id: int,
+    ticket_id: str,
     request: Request,
     status: str = Form(...),
-    conn=Depends(get_db),
+    db=Depends(get_db),
 ):
-    user = get_current_user(request, conn)
+    user = get_current_user(request, db)
     require_admin(user)
 
-    allowed = {"approved", "served", "no_show", "canceled"}
-    if status not in allowed:
-        return RedirectResponse("/admin/tickets", status_code=303)
-
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT status, canceled_by FROM tickets WHERE id=%s",
-        (ticket_id,),
-    )
-
-    ticket = cursor.fetchone()
+    ticket = db.tickets.find_one({"_id": ObjectId(ticket_id)})
 
     if not ticket:
         return RedirectResponse("/admin/tickets", status_code=303)
 
-    current_status, canceled_by = ticket
+    current_status = ticket["status"]
 
-    if current_status == "canceled" and canceled_by == "user":
+    # 🔥 дозволені переходи
+    allowed_transitions = {
+        "waiting": ["approved", "canceled"],
+        "approved": ["served", "no_show", "canceled"],
+        "served": [],
+        "no_show": [],
+        "canceled": []
+    }
+
+    # ❌ якщо не можна перейти
+    if status not in allowed_transitions.get(current_status, []):
         return RedirectResponse("/admin/tickets", status_code=303)
 
-    if current_status == "canceled":
-        return RedirectResponse("/admin/tickets", status_code=303)
-
-    if current_status in {"served", "no_show"}:
-        return RedirectResponse("/admin/tickets", status_code=303)
+    update_data = {"status": status}
 
     if status == "canceled":
-        cursor.execute(
-            """
-            UPDATE tickets
-            SET status=%s, canceled_by='admin'
-            WHERE id=%s
-            """,
-            (status, ticket_id),
-        )
-    else:
-        cursor.execute(
-            """
-            UPDATE tickets
-            SET status=%s
-            WHERE id=%s
-            """,
-            (status, ticket_id),
-        )
+        update_data["canceled_by"] = "admin"
 
-    conn.commit()
+    db.tickets.update_one(
+        {"_id": ObjectId(ticket_id)},
+        {"$set": update_data}
+    )
+
+    # 🔥 лог
+    log_action(db, "update_ticket_status", user, {
+        "ticket_id": ticket_id,
+        "from": current_status,
+        "to": status
+    })
 
     return RedirectResponse("/admin/tickets", status_code=303)
 
 
+# 🔹 Services list
 @router.get("/services", response_class=HTMLResponse)
-def services_list(request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
+def services_list(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT id, name, description, is_active FROM services ORDER BY id DESC"
-    )
-
-    services = cursor.fetchall()
+    services = list(db.services.find().sort("_id", -1))
 
     services_list = [
-        {"id": s[0], "name": s[1], "description": s[2], "is_active": s[3]}
+        {
+            "id": str(s["_id"]),
+            "name": s["name"],
+            "description": s.get("description", ""),
+            "is_active": s.get("is_active", True)
+        }
         for s in services
     ]
 
@@ -166,64 +167,40 @@ def services_list(request: Request, conn=Depends(get_db)):
     )
 
 
-@router.get("/services/new", response_class=HTMLResponse)
-def service_new_form(request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
-    require_admin(user)
-
-    return templates.TemplateResponse(
-        "service_form.html",
-        {"request": request, "user": user, "service": None},
-    )
-
-
+# 🔹 Створення сервісу
 @router.post("/services/new")
 def service_create(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
     is_active: str = Form(None),
-    conn=Depends(get_db),
+    db=Depends(get_db),
 ):
-    user = get_current_user(request, conn)
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
+    db.services.insert_one({
+        "name": name,
+        "description": description,
+        "is_active": True if is_active == "on" else False
+    })
 
-    cursor.execute(
-        """
-        INSERT INTO services (name, description, is_active)
-        VALUES (%s,%s,%s)
-        """,
-        (name, description, is_active == "on"),
-    )
-
-    conn.commit()
+    # 🔥 ЛОГ
+    log_action(db, "create_service", user, {"name": name})
 
     return RedirectResponse("/admin/services", status_code=303)
 
 
+# 🔹 Редагування сервісу (форма)
 @router.get("/services/{service_id}/edit", response_class=HTMLResponse)
-def service_edit_form(service_id: int, request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
+def service_edit_form(service_id: str, request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT id, name, description, is_active FROM services WHERE id=%s",
-        (service_id,),
-    )
-
-    service = cursor.fetchone()
+    service = db.services.find_one({"_id": ObjectId(service_id)})
 
     if service:
-        service = {
-            "id": service[0],
-            "name": service[1],
-            "description": service[2],
-            "is_active": service[3],
-        }
+        service["id"] = str(service["_id"])
 
     return templates.TemplateResponse(
         "service_form.html",
@@ -231,80 +208,77 @@ def service_edit_form(service_id: int, request: Request, conn=Depends(get_db)):
     )
 
 
+# 🔹 Оновлення сервісу
 @router.post("/services/{service_id}/edit")
 def service_update(
-    service_id: int,
+    service_id: str,
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
     is_active: str = Form(None),
-    conn=Depends(get_db),
+    db=Depends(get_db),
 ):
-    user = get_current_user(request, conn)
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        UPDATE services
-        SET name=%s, description=%s, is_active=%s
-        WHERE id=%s
-        """,
-        (name, description, is_active == "on", service_id),
+    db.services.update_one(
+        {"_id": ObjectId(service_id)},
+        {
+            "$set": {
+                "name": name,
+                "description": description,
+                "is_active": is_active == "on"
+            }
+        }
     )
 
-    conn.commit()
+    # 🔥 ЛОГ
+    log_action(db, "update_service", user, {"service_id": service_id})
 
     return RedirectResponse("/admin/services", status_code=303)
 
 
+# 🔹 Видалення сервісу
 @router.post("/services/{service_id}/delete")
-def service_delete(service_id: int, request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
+def service_delete(service_id: str, request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
+    db.services.delete_one({"_id": ObjectId(service_id)})
 
-    cursor.execute(
-        "DELETE FROM services WHERE id=%s",
-        (service_id,),
-    )
-
-    conn.commit()
+    # 🔥 ЛОГ
+    log_action(db, "delete_service", user, {"service_id": service_id})
 
     return RedirectResponse("/admin/services", status_code=303)
 
 
+# 🔹 Статистика
 @router.get("/statistics", response_class=HTMLResponse)
-def statistics(request: Request, conn=Depends(get_db)):
-    user = get_current_user(request, conn)
+def statistics(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
     require_admin(user)
 
-    cursor = conn.cursor()
+    status_stats = []
+    for status in ["waiting", "approved", "served", "no_show", "canceled"]:
+        count = db.tickets.count_documents({"status": status})
+        status_stats.append((status, count))
 
-    cursor.execute("""
-        SELECT status, COUNT(*)
-        FROM tickets
-        GROUP BY status
-    """)
-    status_stats = cursor.fetchall()
+    services = list(db.services.find())
+    service_stats = []
 
-    cursor.execute("""
-        SELECT s.name, COUNT(t.id)
-        FROM services s
-        LEFT JOIN tickets t ON s.id = t.service_id
-        GROUP BY s.name
-    """)
-    service_stats = cursor.fetchall()
+    for s in services:
+        count = db.tickets.count_documents({"service_id": str(s["_id"])})
+        service_stats.append((s["name"], count))
 
-    cursor.execute("""
-        SELECT DATE(scheduled_for), COUNT(*)
-        FROM tickets
-        GROUP BY DATE(scheduled_for)
-        ORDER BY DATE(scheduled_for)
-    """)
-    day_stats = cursor.fetchall()
+    tickets = list(db.tickets.find())
+    day_dict = {}
+
+    for t in tickets:
+        if "scheduled_for" in t:
+            day = t["scheduled_for"].date()
+            day_dict[day] = day_dict.get(day, 0) + 1
+
+    day_stats = sorted(day_dict.items())
 
     return templates.TemplateResponse(
         "admin_statistics.html",
@@ -315,4 +289,110 @@ def statistics(request: Request, conn=Depends(get_db)):
             "service_stats": service_stats,
             "day_stats": day_stats
         }
+    )
+
+
+# 🔹 форма створення
+@router.get("/services/new", response_class=HTMLResponse)
+def service_new_form(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    require_admin(user)
+
+    return templates.TemplateResponse(
+        "service_form.html",
+        {"request": request, "user": user, "service": None},
+    )
+
+
+# 🔹 ЛОГИ
+@router.get("/logs", response_class=HTMLResponse)
+def view_logs(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    require_admin(user)
+
+    logs = list(db.logs.find().sort("time", -1))
+
+    return templates.TemplateResponse(
+        "admin_logs.html",
+        {"request": request, "user": user, "logs": logs}
+    )
+
+
+@router.get("/scan/{ticket_id}", response_class=HTMLResponse)
+def scan_ticket(ticket_id: str, request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    require_admin(user)
+
+    ticket = db.tickets.find_one({"_id": ObjectId(ticket_id)})
+
+    if not ticket:
+        return templates.TemplateResponse(
+            "scan_result.html",
+            {"request": request, "message": "Талон не знайдено"}
+        )
+
+    # ❗ перевірка статусу
+    if ticket["status"] in ["approved", "served", "no_show", "canceled"]:
+        return templates.TemplateResponse(
+            "scan_result.html",
+            {"request": request, "message": f"Талон вже оброблений ({ticket['status']})"}
+        )
+
+    # 🔥 зміна статусу
+    db.tickets.update_one(
+        {"_id": ObjectId(ticket_id)},
+        {"$set": {"status": "approved"}}
+    )
+
+    # 🔥 лог
+    db.logs.insert_one({
+        "action": "scan_ticket",
+        "user_id": user["id"],
+        "role": user["role"],
+        "time": datetime.now(),
+        "details": {"ticket_id": ticket_id}
+    })
+
+    return templates.TemplateResponse(
+        "scan_result.html",
+        {"request": request, "message": "Талон підтверджено"}
+    )
+
+
+@router.post("/scan-image")
+async def scan_qr_image(
+    request: Request,
+    file: UploadFile = File(...),
+    db=Depends(get_db)
+):
+    user = get_current_user(request, db)
+    require_admin(user)
+
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents))
+
+    decoded = decode(image)
+
+    if not decoded:
+        return templates.TemplateResponse(
+            "scan_result.html",
+            {"request": request, "message": "QR не знайдено ❌"}
+        )
+
+    qr_data = decoded[0].data.decode()
+
+    # 🔥 витягуємо ID
+    ticket_id = qr_data.split("/")[-1]
+
+    return RedirectResponse(f"/admin/scan/{ticket_id}", status_code=303)
+
+
+@router.get("/scanner", response_class=HTMLResponse)
+def scanner_page(request: Request, db=Depends(get_db)):
+    user = get_current_user(request, db)
+    require_admin(user)
+
+    return templates.TemplateResponse(
+        "scanner.html",
+        {"request": request, "user": user}
     )

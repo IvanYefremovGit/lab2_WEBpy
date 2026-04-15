@@ -1,111 +1,89 @@
 import sqlite3
-import psycopg2
+from pymongo import MongoClient
 
-from database import get_connection
+# 🔌 MongoDB
+client = MongoClient("mongodb://localhost:27017/")
+db = client["queue_db"]
 
-conn = get_connection()
-cursor = conn.cursor()
+# 📌 Явно створюємо колекцію tickets (для звіту)
+if "tickets" not in db.list_collection_names():
+    db.create_collection("tickets")
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL
-);
-""")
+if "logs" not in db.list_collection_names():
+    db.create_collection("logs")
+# 🗑️ Очистимо колекції (щоб не дублювались)
+db.users.delete_many({})
+db.services.delete_many({})
+db.tickets.delete_many({})
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS services (
-    id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    is_active BOOLEAN DEFAULT TRUE
-);
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS tickets (
-    id SERIAL PRIMARY KEY,
-    ticket_number TEXT,
-    user_id INTEGER REFERENCES users(id),
-    service_id INTEGER REFERENCES services(id),
-    scheduled_for TIMESTAMP,
-    status TEXT,
-    canceled_by TEXT
-);
-""")
-
-conn.commit()
-conn.close()
-
+# 🔗 SQLite
 sqlite_conn = sqlite3.connect("queue.db")
 sqlite_cursor = sqlite_conn.cursor()
 
-pg_conn = psycopg2.connect(
-    dbname="queue_db",
-    user="postgres",
-    password="28032006",
-    host="localhost",
-    port="5432"
-)
-pg_cursor = pg_conn.cursor()
-
-
-sqlite_cursor.execute("SELECT username, password, role FROM users")
+# =========================
+# 📌 USERS
+# =========================
+sqlite_cursor.execute("SELECT id, username, password, role FROM users")
 users = sqlite_cursor.fetchall()
 
+user_map = {}  # старий id -> новий ObjectId
+
 for u in users:
-    pg_cursor.execute(
-        """
-        INSERT INTO users (username, password, role)
-        VALUES (%s,%s,%s)
-        ON CONFLICT (username) DO NOTHING
-        """,
-        u
-    )
+    old_id, username, password, role = u
+
+    result = db.users.insert_one({
+        "username": username,
+        "password": password,
+        "role": role
+    })
+
+    user_map[old_id] = str(result.inserted_id)
 
 
-sqlite_cursor.execute("SELECT name, description, is_active FROM services")
+# =========================
+# 📌 SERVICES
+# =========================
+sqlite_cursor.execute("SELECT id, name, description, is_active FROM services")
 services = sqlite_cursor.fetchall()
 
+service_map = {}
+
 for s in services:
-    name, description, is_active = s
+    old_id, name, description, is_active = s
 
-    is_active = bool(is_active)
+    result = db.services.insert_one({
+        "name": name,
+        "description": description,
+        "is_active": bool(is_active)
+    })
 
-    pg_cursor.execute(
-        """
-        INSERT INTO services (name, description, is_active)
-        VALUES (%s,%s,%s)
-        """,
-        (name, description, is_active)
-    )
+    service_map[old_id] = str(result.inserted_id)
 
 
-sqlite_cursor.execute(
-    """
-    SELECT ticket_number, user_id, service_id, scheduled_for, status, canceled_by
-    FROM tickets
-    """
-)
+# =========================
+# 📌 TICKETS
+# =========================
+sqlite_cursor.execute("""
+SELECT ticket_number, user_id, service_id, scheduled_for, status, canceled_by
+FROM tickets
+""")
 
 tickets = sqlite_cursor.fetchall()
 
 for t in tickets:
-    pg_cursor.execute(
-        """
-        INSERT INTO tickets
-        (ticket_number, user_id, service_id, scheduled_for, status, canceled_by)
-        VALUES (%s,%s,%s,%s,%s,%s)
-        """,
-        t
-    )
+    ticket_number, user_id, service_id, scheduled_for, status, canceled_by = t
+
+    db.tickets.insert_one({
+        "ticket_number": ticket_number,
+        "user_id": user_map.get(user_id),
+        "service_id": service_map.get(service_id),
+        "scheduled_for": scheduled_for,
+        "status": status,
+        "canceled_by": canceled_by
+    })
 
 
-pg_conn.commit()
-
+# 🔚 Закриваємо SQLite
 sqlite_conn.close()
-pg_conn.close()
 
-print("Migration completed successfully")
+print("✅ Migration to MongoDB completed!")

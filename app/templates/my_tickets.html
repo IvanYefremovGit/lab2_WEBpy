@@ -11,13 +11,14 @@
 
 <div class="card card-soft p-3">
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
+    <table class="table table-hover mb-0 text-center align-middle">
       <thead>
         <tr>
           <th>Талон</th>
           <th>Час</th>
           <th>Послуга</th>
           <th>Статус</th>
+          <th>QR</th>
           <th class="text-end">Дія</th>
         </tr>
       </thead>
@@ -25,8 +26,11 @@
       {% for t in tickets %}
         <tr>
           <td class="fw-semibold">{{ t.ticket_number }}</td>
+
           <td>{{ t.scheduled_for }}</td>
+
           <td>{{ t.service.name }}</td>
+
           <td>
             {% if t.status == "waiting" %}
               <span class="badge text-bg-warning badge-soft">waiting</span>
@@ -42,6 +46,16 @@
               <span class="badge text-bg-light badge-soft">{{ t.status }}</span>
             {% endif %}
           </td>
+
+          <!-- 🔥 QR -->
+          <td>
+            {% if t.qr %}
+              <img src="data:image/png;base64,{{ t.qr }}" width="80">
+            {% else %}
+              —
+            {% endif %}
+          </td>
+
           <td class="text-end">
             {% if t.status in ["waiting", "approved"] %}
               <form method="post" action="/tickets/{{ t.id }}/cancel" class="d-inline">
@@ -51,6 +65,7 @@
               <span class="text-muted">—</span>
             {% endif %}
           </td>
+
         </tr>
       {% endfor %}
       </tbody>

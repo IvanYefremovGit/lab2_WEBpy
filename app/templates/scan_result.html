@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container text-center mt-5">
+
+  <div class="card card-soft p-4">
+
+    {% if "підтверджено" in message %}
+      <h3 class="text-success">{{ message }} ✅</h3>
+    {% elif "не знайдено" in message %}
+      <h3 class="text-danger">{{ message }} ❌</h3>
+    {% else %}
+      <h3 class="text-warning">{{ message }}</h3>
+    {% endif %}
+
+    <a href="/admin/tickets" class="btn btn-primary mt-3">
+      Назад до черги
+    </a>
+
+  </div>
+
+</div>
+
+{% endblock %}

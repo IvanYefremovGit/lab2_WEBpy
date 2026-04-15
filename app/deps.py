@@ -1,9 +1,4 @@
-from database import get_connection
-
+from database import db
 
 def get_db():
-    conn = get_connection()
-    try:
-        yield conn
-    finally:
-        conn.close()
+    return db
