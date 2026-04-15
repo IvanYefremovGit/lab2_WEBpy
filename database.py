@@ -1,5 +1,6 @@
 import psycopg
 
+
 def get_connection():
     conn = psycopg.connect(
         host="localhost",

@@ -24,7 +24,6 @@ DAYS_AHEAD = 14
 BLOCKING_STATUSES = {"waiting", "approved", "served", "no_show"}
 
 
-# 🔥 Універсальна функція логування
 def log_action(db, action: str, user: dict, details: dict = None):
     db.logs.insert_one({
         "action": action,
@@ -44,7 +43,6 @@ def generate_qr(data: str):
     return base64.b64encode(buffer.getvalue()).decode()
 
 
-# 🔹 Дати
 def build_dates(days_ahead: int = DAYS_AHEAD):
     dates = []
     now = datetime.now()
@@ -64,7 +62,6 @@ def build_dates(days_ahead: int = DAYS_AHEAD):
     return dates
 
 
-# 🔹 Всі можливі часи
 def build_all_times():
     times = []
     h, m = WORK_START.hour, WORK_START.minute
@@ -83,7 +80,6 @@ def build_all_times():
     return times
 
 
-# 🔹 Вільний час
 def build_free_times(db, date_str: str):
     all_times = build_all_times()
 
@@ -111,7 +107,6 @@ def build_free_times(db, date_str: str):
     return free_times
 
 
-# 🔹 Рендер головної
 def render_index(request: Request, db, user, error: str | None = None):
     services = list(db.services.find({"is_active": True}))
 
@@ -155,7 +150,6 @@ def render_index(request: Request, db, user, error: str | None = None):
     )
 
 
-# 🔹 index
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request, db=Depends(get_db)):
     if not request.session.get("user_id"):
@@ -172,7 +166,6 @@ def index(request: Request, db=Depends(get_db)):
     return render_index(request, db, user)
 
 
-# 🔹 API часу
 @router.get("/free-times")
 def free_times_api(request: Request, date: str, db=Depends(get_db)):
     if not request.session.get("user_id"):
@@ -190,7 +183,7 @@ def free_times_api(request: Request, date: str, db=Depends(get_db)):
     return JSONResponse({"times": times})
 
 
-# 🔹 login
+
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "error": None, "user": None})
@@ -216,7 +209,6 @@ def login_action(
 
     login_user(request, str(user["_id"]))
 
-    # 🔥 ЛОГ
     log_action(db, "login", {
         "id": str(user["_id"]),
         "role": user["role"]
@@ -228,14 +220,12 @@ def login_action(
     return RedirectResponse("/", status_code=303)
 
 
-# 🔹 logout
 @router.post("/logout")
 def logout_action(request: Request):
     logout_user(request)
     return RedirectResponse("/login", status_code=303)
 
 
-# 🔹 створення талону
 @router.post("/tickets/create")
 def create_ticket(
     request: Request,
@@ -263,13 +253,11 @@ def create_ticket(
         "status": "waiting"
     })
 
-    # 🔥 ЛОГ
     log_action(db, "create_ticket", user, {"ticket_number": ticket_number})
 
     return RedirectResponse("/my/tickets", status_code=303)
 
 
-# 🔹 мої талони
 @router.get("/my/tickets", response_class=HTMLResponse)
 def my_tickets(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -297,7 +285,6 @@ def my_tickets(request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 скасування
 @router.post("/tickets/{ticket_id}/cancel")
 def cancel_ticket(ticket_id: str, request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -313,13 +300,11 @@ def cancel_ticket(ticket_id: str, request: Request, db=Depends(get_db)):
             {"$set": {"status": "canceled", "canceled_by": "user"}}
         )
 
-        # 🔥 ЛОГ
         log_action(db, "cancel_ticket", user, {"ticket_id": ticket_id})
 
     return RedirectResponse("/my/tickets", status_code=303)
 
 
-# 🔹 статистика
 @router.get("/my/statistics", response_class=HTMLResponse)
 def my_statistics(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)

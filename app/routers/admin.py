@@ -16,7 +16,7 @@ templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-# 🔥 універсальна функція логів
+
 def log_action(db, action: str, user: dict, details: dict = None):
     db.logs.insert_one({
         "action": action,
@@ -27,7 +27,6 @@ def log_action(db, action: str, user: dict, details: dict = None):
     })
 
 
-# 🔹 Dashboard
 @router.get("", response_class=HTMLResponse)
 def admin_dashboard(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -58,7 +57,6 @@ def admin_dashboard(request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 Tickets list
 @router.get("/tickets", response_class=HTMLResponse)
 def tickets_list(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -91,7 +89,6 @@ def tickets_list(request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 Зміна статусу
 @router.post("/tickets/{ticket_id}/status")
 @router.post("/tickets/{ticket_id}/status")
 def set_ticket_status(
@@ -110,7 +107,6 @@ def set_ticket_status(
 
     current_status = ticket["status"]
 
-    # 🔥 дозволені переходи
     allowed_transitions = {
         "waiting": ["approved", "canceled"],
         "approved": ["served", "no_show", "canceled"],
@@ -119,7 +115,6 @@ def set_ticket_status(
         "canceled": []
     }
 
-    # ❌ якщо не можна перейти
     if status not in allowed_transitions.get(current_status, []):
         return RedirectResponse("/admin/tickets", status_code=303)
 
@@ -133,7 +128,6 @@ def set_ticket_status(
         {"$set": update_data}
     )
 
-    # 🔥 лог
     log_action(db, "update_ticket_status", user, {
         "ticket_id": ticket_id,
         "from": current_status,
@@ -143,7 +137,6 @@ def set_ticket_status(
     return RedirectResponse("/admin/tickets", status_code=303)
 
 
-# 🔹 Services list
 @router.get("/services", response_class=HTMLResponse)
 def services_list(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -167,7 +160,6 @@ def services_list(request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 Створення сервісу
 @router.post("/services/new")
 def service_create(
     request: Request,
@@ -185,13 +177,11 @@ def service_create(
         "is_active": True if is_active == "on" else False
     })
 
-    # 🔥 ЛОГ
     log_action(db, "create_service", user, {"name": name})
 
     return RedirectResponse("/admin/services", status_code=303)
 
 
-# 🔹 Редагування сервісу (форма)
 @router.get("/services/{service_id}/edit", response_class=HTMLResponse)
 def service_edit_form(service_id: str, request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -208,7 +198,6 @@ def service_edit_form(service_id: str, request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 Оновлення сервісу
 @router.post("/services/{service_id}/edit")
 def service_update(
     service_id: str,
@@ -232,13 +221,11 @@ def service_update(
         }
     )
 
-    # 🔥 ЛОГ
     log_action(db, "update_service", user, {"service_id": service_id})
 
     return RedirectResponse("/admin/services", status_code=303)
 
 
-# 🔹 Видалення сервісу
 @router.post("/services/{service_id}/delete")
 def service_delete(service_id: str, request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -246,13 +233,11 @@ def service_delete(service_id: str, request: Request, db=Depends(get_db)):
 
     db.services.delete_one({"_id": ObjectId(service_id)})
 
-    # 🔥 ЛОГ
     log_action(db, "delete_service", user, {"service_id": service_id})
 
     return RedirectResponse("/admin/services", status_code=303)
 
 
-# 🔹 Статистика
 @router.get("/statistics", response_class=HTMLResponse)
 def statistics(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -292,7 +277,6 @@ def statistics(request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 форма створення
 @router.get("/services/new", response_class=HTMLResponse)
 def service_new_form(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -304,7 +288,6 @@ def service_new_form(request: Request, db=Depends(get_db)):
     )
 
 
-# 🔹 ЛОГИ
 @router.get("/logs", response_class=HTMLResponse)
 def view_logs(request: Request, db=Depends(get_db)):
     user = get_current_user(request, db)
@@ -331,20 +314,17 @@ def scan_ticket(ticket_id: str, request: Request, db=Depends(get_db)):
             {"request": request, "message": "Талон не знайдено"}
         )
 
-    # ❗ перевірка статусу
     if ticket["status"] in ["approved", "served", "no_show", "canceled"]:
         return templates.TemplateResponse(
             "scan_result.html",
             {"request": request, "message": f"Талон вже оброблений ({ticket['status']})"}
         )
 
-    # 🔥 зміна статусу
     db.tickets.update_one(
         {"_id": ObjectId(ticket_id)},
         {"$set": {"status": "approved"}}
     )
 
-    # 🔥 лог
     db.logs.insert_one({
         "action": "scan_ticket",
         "user_id": user["id"],
@@ -381,7 +361,6 @@ async def scan_qr_image(
 
     qr_data = decoded[0].data.decode()
 
-    # 🔥 витягуємо ID
     ticket_id = qr_data.split("/")[-1]
 
     return RedirectResponse(f"/admin/scan/{ticket_id}", status_code=303)
